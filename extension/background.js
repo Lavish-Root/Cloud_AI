@@ -14,25 +14,28 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getSecurityData') {
         const backendUrl = "http://localhost:8000/api/security/check";
-        const url = sender.tab.url.toLowerCase();
         
-        // Context-aware indicators for simulated threat detection
-        const indicators = {
-            change_freq: url.includes('iam') ? 8 : Math.floor(Math.random() * 3),
-            unauth_attempts: url.includes('iam') ? 6 : Math.floor(Math.random() * 2),
-            public_resources: url.includes('s3') || url.includes('storage') ? 1 : 0
-        };
+        // When message is from popup, sender.tab is undefined. We must query the active tab.
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (!tabs || tabs.length === 0) {
+                sendResponse({ status: 'error', message: 'No active tab found.' });
+                return;
+            }
 
-        fetch(backendUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, indicators })
-        })
-        .then(response => response.json())
-        .then(data => sendResponse(data))
-        .catch(err => {
-            console.error('Error contacting backend:', err);
-            sendResponse({ status: 'error', message: 'Could not reach backend security engine.' });
+            const activeTab = tabs[0];
+            const url = activeTab.url.toLowerCase();
+
+            fetch(backendUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url }) // Backend now manages indicators internally
+            })
+            .then(response => response.json())
+            .then(data => sendResponse(data))
+            .catch(err => {
+                console.error('Error contacting backend:', err);
+                sendResponse({ status: 'error', message: 'Could not reach backend security engine.' });
+            });
         });
         return true; // async handle
     }

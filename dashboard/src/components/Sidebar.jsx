@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Layout, Lock, Settings, Download, Zap } from 'lucide-react';
+import { Shield, Layout, Lock, Settings, Download, Zap, Activity } from 'lucide-react';
 
 const NavItem = ({ icon: Icon, label, active, onClick }) => (
   <div 

@@ -7,6 +7,12 @@ from typing import List, Dict
 
 router = APIRouter(prefix="/api/reports")
 
+# In-memory storage for real-time reporting events
+report_data: List[Dict] = [
+    {"Provider": "AWS", "Resource": "S3-Prod-Backup", "Violation": "Versioning Disabled", "Status": "MEDIUM"},
+    {"Provider": "GCP", "Resource": "IAM Policy", "Violation": "New Owner Detected", "Status": "HIGH"},
+]
+
 @router.get("/security-status")
 async def get_security_status_report():
     """Proxy for the main security audit PDF."""
@@ -14,11 +20,7 @@ async def get_security_status_report():
 
 @router.get("/csv")
 async def export_csv():
-    # Simulated report data
-    report_data = [
-        {"Provider": "AWS", "Resource": "S3 Bucket", "Violation": "Public Access", "Status": "CRITICAL"},
-        {"Provider": "GCP", "Resource": "IAM Policy", "Violation": "Owner Hijack", "Status": "CRITICAL"},
-    ]
+    # Uses the global real-time report_data
     df = pd.DataFrame(report_data)
     output = StringIO()
     df.to_csv(output, index=False)
