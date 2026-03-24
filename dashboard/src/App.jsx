@@ -19,7 +19,8 @@ const App = () => {
     provider: 'aws',
     mlInference: { threat_probability: 0, anomaly_level: 'LOW' }
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [pendingAction, setPendingAction] = useState(null);
@@ -29,9 +30,17 @@ const App = () => {
     try {
       // Backend automatically manages indicators for real-time consistency
       const response = await axios.post(`${API_BASE}/api/security/check`, { 
-        url: "console.cloud.google.com" 
+        url: "console.cloud.google.com",
+        indicators: {
+          change_freq: Math.floor(Math.random() * 5),
+          unauth_attempts: Math.floor(Math.random() * 2),
+          public_resources: 1
+        }
       });
       setSecurityData(response.data);
+      
+      const historyRes = await axios.get(`${API_BASE}/api/security/history`);
+      setHistory(historyRes.data);
     } catch (err) { 
       console.error("Data fetch failed", err); 
     } finally { 
@@ -76,6 +85,18 @@ const App = () => {
   const onRemediated = (ruleId) => {
     fetchSecurityData();
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#030712] flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-6" />
+          <h2 className="text-xl font-black text-white tracking-widest uppercase animate-pulse">Initializing Enterprise Security Engine...</h2>
+          <p className="text-slate-500 text-sm mt-2 font-bold uppercase tracking-tighter">Authenticating Multi-Cloud Federated Nodes</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex overflow-hidden selection:bg-blue-500/30">
@@ -137,11 +158,11 @@ const App = () => {
       <Sidebar 
         currentView={currentView} 
         setCurrentView={setCurrentView} 
-        onDownloadReport={() => window.open(`${API_BASE}/api/report/security-status`)} 
+        onDownloadReport={() => window.open(`${API_BASE}/api/reports/security-status`)} 
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <Header provider={securityData.provider} score={securityData.riskScore} />
+        <Header currentView={currentView} provider={securityData.provider} score={securityData.riskScore} />
 
         <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
           <AnimatePresence mode="wait">
@@ -153,7 +174,7 @@ const App = () => {
               transition={{ duration: 0.3 }}
             >
               {currentView === 'Overview' && (
-                <Overview data={securityData} triggerIgnore={triggerIgnore} />
+                <Overview data={securityData} history={history} triggerIgnore={triggerIgnore} />
               )}
               {currentView === 'Remediation' && (
                 <RemediationCenter 

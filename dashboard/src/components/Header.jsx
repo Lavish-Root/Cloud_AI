@@ -1,12 +1,17 @@
 import React from 'react';
 import { Search, Bell, Settings, ChevronDown } from 'lucide-react';
 
-const Header = ({ currentView }) => {
+const Header = ({ currentView, provider, score }) => {
   return (
     <header className="h-24 border-b border-slate-800/60 px-10 flex items-center justify-between bg-[#030712]/40 backdrop-blur-md shrink-0">
       <div className="flex flex-col">
-        <div className="text-2xl font-bold text-white tracking-tight">{currentView}</div>
-        <div className="text-xs text-slate-500 font-medium tracking-wide">CloudGuard Admin Console • Global Infrastructure</div>
+        <div className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+          {currentView} 
+          <span className="text-[10px] font-black bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded border border-blue-500/20 uppercase tracking-widest">
+            {provider}
+          </span>
+        </div>
+        <div className="text-xs text-slate-500 font-medium tracking-wide">CloudGuard Admin Console • Score: {score}/100</div>
       </div>
 
       <div className="flex items-center space-x-8">

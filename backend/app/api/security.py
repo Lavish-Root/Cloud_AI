@@ -5,6 +5,7 @@ from app.rules.checker import rules_engine
 from app.ml.engine import ml_engine
 from app.services.cloud_scanner import scanner
 from app.services.security_state import security_state
+from app.db.database import save_scan, get_recent_scans
 
 router = APIRouter(prefix="/api/security")
 
@@ -55,7 +56,7 @@ async def perform_security_assessment(request: SecurityCheckRequest):
     url = request.url.lower()
     if "aws.amazon.com" in url: provider = "aws"
     elif "azure.com" in url: provider = "azure"
-    elif "console.cloud.google.com" in url or "cloud.google.com" in url: provider = "gcp"
+    elif "console.cloud.google.com" in url: provider = "gcp"
 
     if provider == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported cloud provider URL.")
@@ -63,26 +64,22 @@ async def perform_security_assessment(request: SecurityCheckRequest):
     # 2. Real-Time Security Scan
     actual_state: Dict[str, Any] = scanner.scan_environment(provider)
     
-    # 3. Use Global Backend-Managed Indicators (Resolves 'random on refresh')
-    indicators = security_state.get_indicators()
-
-    # 4. Hybrid Scoring
-    # The collaborator version passes full state, so I'll follow that pattern
+    # 3. Hybrid Threat Intelligence
     rule_results = rules_engine.evaluate(provider, actual_state)
     
-    # ML Features
+    indicators = request.indicators or SecurityIndicator()
     ml_features = [
         indicators.change_freq,
         indicators.unauth_attempts,
         indicators.public_resources,
-        indicators.sensitive_calls
+        getattr(indicators, 'sensitive_calls', 2)
     ]
+    
     ml_threat_prob = ml_engine.predict_risk(ml_features)
     ml_score = (1 - ml_threat_prob) * 100
 
-    # 5. Contextual Alerting (Hijack Detection)
-    if (provider == "gcp" or "console.cloud.google.com" in url) and indicators.unauth_attempts > 5:
-        # Use the collaborator's naming convention "CRITICAL HIJACK ATTEMPT"
+    # 4. Contextual Alerting (Hijack Detection)
+    if provider == "gcp" and indicators.unauth_attempts > 5:
         rule_results["findings"].insert(0, {
             "rule_id": "GCP_OWNER_REMOVAL_DETECTED",
             "name": "CRITICAL HIJACK ATTEMPT",
@@ -91,18 +88,22 @@ async def perform_security_assessment(request: SecurityCheckRequest):
         })
         rule_results["overall_score"] = min(rule_results["overall_score"], 15)
 
-    # Weighted: 70% Rules, 30% ML (Following collaborator's updated weights)
     final_risk_score = int((0.7 * rule_results["overall_score"]) + (0.3 * ml_score))
+
+    # --- ENTERPRISE PERSISTENCE ---
+    ml_inference = {
+        "threat_probability": ml_threat_prob,
+        "anomaly_level": "LOW" if ml_threat_prob < 0.3 else ("HIGH" if ml_threat_prob > 0.7 else "MEDIUM")
+    }
+    
+    save_scan(provider, final_risk_score, rule_results["findings"], ml_inference)
 
     return {
         "status": "success",
         "provider": provider,
         "riskScore": final_risk_score,
         "ruleFindings": rule_results["findings"],
-        "mlInference": {
-            "threat_probability": ml_threat_prob,
-            "anomaly_level": "LOW" if ml_threat_prob < 0.3 else ("HIGH" if ml_threat_prob > 0.7 else "MEDIUM")
-        },
+        "mlInference": ml_inference,
         "recommendations": _get_recommendations(provider, rule_results["findings"])
     }
 
@@ -112,9 +113,23 @@ async def intercept_hijack():
     security_state.resolve_hijack()
     return {"status": "success", "message": "Attack vector neutralized. Baseline restored."}
 
+@router.get("/history")
+async def get_security_history():
+    """Returns the last 50 security scans for trend analysis."""
+    return get_recent_scans(limit=50)
+
 @router.post("/remediate")
 async def trigger_auto_remediation(request: RemediationRequest):
-    """Enterprise remediation engine (Simulated)."""
+    """Enterprise remediation engine that modifies the persistent Cloud Environment."""
+    from app.db.database import save_audit_log
+    from app.services.cloud_environment import cloud_env
+    
+    # Apply the fix to the persistent state
+    cloud_env.apply_remediation(request.provider, request.resource_id, request.issue_id)
+    
+    # Log the action for audit compliance
+    save_audit_log("REMEDIATION", request.resource_id, f"Auto-reverting {request.issue_id}")
+    
     return {
         "status": "success",
         "action": "AUTO_REMEDIATION_TRIGGERED",

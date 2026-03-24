@@ -29,7 +29,7 @@ ChartJS.register(
   Legend
 );
 
-const Overview = ({ data, triggerIgnore }) => {
+const Overview = ({ data, history, triggerIgnore }) => {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -51,12 +51,20 @@ const Overview = ({ data, triggerIgnore }) => {
     }
   };
 
+  // Process history for the chart (last 10 points)
+  const sortedHistory = [...history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const displayHistory = sortedHistory.slice(-10);
+  
   const chartData = {
-    labels: ['1h ago', '45m ago', '30m ago', '15m ago', 'Now'],
+    labels: displayHistory.length > 0 
+      ? displayHistory.map(h => new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+      : ['1h ago', '45m ago', '30m ago', '15m ago', 'Now'],
     datasets: [{
       fill: true,
       label: 'Security Score',
-      data: [82, 78, 85, 80, data.riskScore],
+      data: displayHistory.length > 0 
+        ? displayHistory.map(h => h.risk_score)
+        : [82, 78, 85, 80, data.riskScore],
       borderColor: '#3b82f6',
       backgroundColor: 'rgba(59, 130, 246, 0.1)',
       tension: 0.4,
