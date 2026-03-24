@@ -1,33 +1,67 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --bg-dark: #0f172a;
-  --bg-card: #1e293b;
-  --accent-primary: #3b82f6;
-  --accent-secondary: #0ea5e9;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+@layer base {
+  body {
+    @apply bg-[#030712] text-slate-100 antialiased selection:bg-blue-500/30;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
 }
 
-body {
-  font-family: 'Inter', sans-serif;
-  background-color: var(--bg-dark);
-  color: #f8fafc;
-  margin: 0;
-  -webkit-font-smoothing: antialiased;
+@layer components {
+  .glass-card {
+    @apply bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 hover:border-slate-700/80 transition-all duration-300;
+  }
+
+  .premium-gradient {
+    @apply bg-gradient-to-br from-blue-600 to-indigo-700;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-800 rounded-full;
+  }
+
+  .stat-card-glow {
+    @apply relative overflow-hidden;
+  }
+
+  .stat-card-glow::after {
+    content: '';
+    @apply absolute -inset-[100%] bg-gradient-to-br from-blue-500/5 via-transparent to-transparent opacity-0 transition-opacity duration-500 pointer-events-none;
+  }
+
+  .stat-card-glow:hover::after {
+    @apply opacity-100;
+  }
 }
 
-.glass-morphism {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+/* Animations */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-.animate-pulse-slow {
-  animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.animate-pulse-soft {
+  animation: pulse-soft 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.shield-glow {
+  filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.4));
 }
 
 @keyframes pulse {

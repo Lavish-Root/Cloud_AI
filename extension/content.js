@@ -6,55 +6,55 @@ const injectSecurityHUD = () => {
     container.id = 'cloudguard-ai-hud';
     container.style = `
         position: fixed;
-        top: 20px;
-        right: 20px;
-        width: 320px;
-        background: rgba(26, 32, 44, 0.95);
-        border: 2px solid #3182ce;
-        border-top-width: 6px;
-        border-radius: 12px;
-        z-index: 999999;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        top: 24px;
+        right: 24px;
+        width: 340px;
+        background: rgba(3, 7, 18, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 28px;
+        z-index: 10000;
+        font-family: 'Inter', -apple-system, sans-serif;
         color: white;
-        padding: 16px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(8px);
-        transition: transform 0.3s ease;
+        padding: 24px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(20px);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: cg-slide-in 0.5s ease-out;
     `;
 
     container.innerHTML = `
-        <div style="position: absolute; top: 10px; right: 12px; cursor: pointer; color: #a0aec0; font-size: 18px; font-weight: bold; line-height: 1;" id="cg-close-btn">
-            &times;
+        <style>
+            @keyframes cg-slide-in { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            @keyframes cg-pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+            #cg-dashboard-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3); }
+            #cg-dashboard-btn:active { transform: translateY(0); }
+        </style>
+        <div style="position: absolute; top: 18px; right: 20px; cursor: pointer; color: #475569; font-size: 20px;" id="cg-close-btn">&times;</div>
+        
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
+            <div style="width: 28px; height: 28px; background: #2563eb; border-radius: 8px; box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);"></div>
+            <div style="font-weight: 800; font-size: 16px; letter-spacing: -0.025em; color: white;">CloudGuard AI</div>
+            <div id="cg-status-badge" style="margin-left: auto; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; border-radius: 8px; font-size: 10px; padding: 4px 10px; font-weight: 800; text-transform: uppercase;">Active Monitoring</div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 8px; margin-top: 5px;">
-            <div style="font-weight: 700; font-size: 16px; color: #63b3ed;">CloudGuard AI</div>
-            <div id="cg-status-badge" style="background: #48bb78; color: white; border-radius: 6px; font-size: 12px; padding: 2px 8px; font-weight: bold;">Monitoring</div>
-        </div>
-        <div style="margin-bottom: 15px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 14px; color: #a0aec0;">Risk Score</span>
-                <span id="cg-risk-score" style="font-size: 32px; font-weight: 800; color: #48bb78;">98/100</span>
+
+        <div style="margin-bottom: 24px; background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+                <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em;">Contextual Risk</span>
+                <span id="cg-risk-score" style="font-size: 36px; font-weight: 800; color: #10b981; letter-spacing: -0.05em;">--</span>
             </div>
-            <div style="height: 6px; width: 100%; background: #2d3748; border-radius: 3px; margin-top: 5px;">
-                <div id="cg-risk-bar" style="height: 100%; width: 98%; background: linear-gradient(90deg, #48bb78, #38a169); border-radius: 3px;"></div>
-            </div>
-        </div>
-        <div style="font-size: 13px; color: #e2e8f0; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; margin-bottom: 6px;">
-                <span style="color: #48bb78; margin-right: 8px;">✓</span>
-                <span>IAM Policy Compliant</span>
-            </div>
-            <div style="display: flex; align-items: center; margin-bottom: 6px;">
-                <span style="color: #48bb78; margin-right: 8px;">✓</span>
-                <span>Storage Encryption Verified</span>
-            </div>
-            <div style="display: flex; align-items: center;">
-                <span style="color: #48bb78; margin-right: 8px;">✓</span>
-                <span>Network Baseline Secure</span>
+            <div style="height: 6px; width: 100%; background: rgba(255, 255, 255, 0.05); border-radius: 100px;">
+                <div id="cg-risk-bar" style="height: 100%; width: 0%; background: #10b981; border-radius: 100px; transition: width 1s ease-out; box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);"></div>
             </div>
         </div>
-        <button id="cg-dashboard-btn" style="width: 100%; background: #3182ce; border: none; padding: 10px; border-radius: 6px; color: white; font-weight: 600; cursor: pointer; transition: background 0.2s;">
-            Open Security Dashboard
+
+        <div style="font-size: 12px; font-weight: 500; color: #94a3b8; margin-bottom: 24px; display: grid; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;"><span style="color: #10b981;">●</span> Identity Access: <span style="color: #f8fafc; font-weight: 700;">Secure</span></div>
+            <div style="display: flex; align-items: center; gap: 10px;"><span style="color: #10b981;">●</span> Network Egress: <span style="color: #f8fafc; font-weight: 700;">Encrypted</span></div>
+            <div style="display: flex; align-items: center; gap: 10px;"><span style="color: #10b981;">●</span> Audit Integrity: <span style="color: #10b981; font-weight: 700;">Verified</span></div>
+        </div>
+
+        <button id="cg-dashboard-btn" style="width: 100%; background: #2563eb; border: none; padding: 16px; border-radius: 18px; color: white; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);">
+            Admin Console
         </button>
     `;
 
