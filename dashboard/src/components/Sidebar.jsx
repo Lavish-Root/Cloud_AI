@@ -39,13 +39,14 @@ const Sidebar = ({ currentView, setCurrentView, onDownloadReport }) => {
 
       <nav className="px-6 flex-1 space-y-2">
         <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 px-4">Main Menu</div>
-        <NavItem active={currentView === 'Overview'} icon={Layout} label="Dashboard" onClick={() => setCurrentView('Overview')} />
-        <NavItem active={currentView === 'Governance'} icon={Lock} label="Governance" onClick={() => setCurrentView('Governance')} />
-        <NavItem active={currentView === 'Compliance'} icon={Settings} label="Compliance" onClick={() => setCurrentView('Compliance')} />
+        <NavItem active={currentView === 'Overview'} icon={Layout} label="Overview" onClick={() => setCurrentView('Overview')} />
+        <NavItem active={currentView === 'Remediation'} icon={Zap} label="Remediation" onClick={() => setCurrentView('Remediation')} />
+        <NavItem active={currentView === 'Inventory'} icon={Lock} label="Cloud Inventory" onClick={() => setCurrentView('Inventory')} />
+        <NavItem active={currentView === 'Policies'} icon={Settings} label="Policies" onClick={() => setCurrentView('Policies')} />
         
         <div className="pt-8">
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 px-4">Insights</div>
-          <NavItem active={false} icon={Zap} label="Threat Intelligence" onClick={() => {}} />
+          <NavItem active={currentView === 'ThreatIntel'} icon={Activity} label="Threat Intelligence" onClick={() => setCurrentView('ThreatIntel')} />
         </div>
       </nav>
 

@@ -48,72 +48,51 @@ class RemediationRequest(BaseModel):
 
 @router.post("/check", response_model=SecurityCheckResponse)
 async def perform_security_assessment(request: SecurityCheckRequest):
-    """Unified entry point for AI-driven security assessments."""
+    """Enterprise-grade security assessment utilizing hybrid Rule + ML analysis."""
     
     # 1. Detect Provider from URL
     provider = "unknown"
     url = request.url.lower()
     if "aws.amazon.com" in url: provider = "aws"
     elif "azure.com" in url: provider = "azure"
-    elif "cloud.google.com" in url: provider = "gcp"
+    elif "console.cloud.google.com" in url: provider = "gcp"
 
     if provider == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported cloud provider URL.")
 
-    # 2. Get Real-Time Cloud Scan State
+    # 2. Real-Time Security Scan
+    # The scanner now returns a detailed resource map matching the upgraded RulesEngine
     actual_state: Dict[str, Any] = scanner.scan_environment(provider)
     
-    # 3. Map actual state to configuration for Rules Engine
-    # This removes the hardcoded mock_config and uses the scanner's output
-    config: Dict[str, Any] = {
-        "mfa_root": all(role.get("mfa", False) for role in actual_state.get("iam_roles", []) if "Admin" in role.get("name", "")),
-        "s3_public": any(bucket.get("public", False) for bucket in actual_state.get("storage_buckets", [])),
-        "ssh_port_open": any(rule.get("port") == 22 and rule.get("source") == "0.0.0.0/0" for rule in actual_state.get("firewall_rules", [])),
-        "compliant": actual_state.get("resources") != f"{provider}-mock-data" # Just a sanity check
-    }
-
-    # Override with request config if provided (for testing/extension)
-    if request.config:
-        config.update(cast(Dict[str, Any], request.config))
-
+    # 3. Hybrid Threat Intelligence
+    # Pass the full state to the rules engine
+    rule_results = rules_engine.evaluate(provider, actual_state)
+    
+    # ML features: [change_freq, unauth_attempts, public_resources, sensitive_calls]
     indicators = request.indicators or SecurityIndicator()
-
-    # 4. Hybrid Scoring
-    rule_results = rules_engine.evaluate(provider, config)
-    
-    # --- Real-Time IAM Monitoring (DETECTING OWNER REMOVAL/CREATION) ---
-    iam_findings = []
-    if "console.cloud.google.com" in url or provider == "gcp":
-        # Check Indicators for Hijack Attempts
-        if indicators.unauth_attempts > 5:
-            iam_findings.append({
-                "rule_id": "GCP_OWNER_REMOVAL_DETECTED",
-                "name": "OWNER REMOVAL ATTEMPT",  # Matches Dashboard's expected string
-                "status": "FAIL",
-                "severity": "CRITICAL"
-            })
-        if indicators.change_freq > 10:
-            iam_findings.append({
-                "rule_id": "GCP_NEW_OWNER_DETECTED",
-                "name": "New Owner Account Created",
-                "status": "FAIL", 
-                "severity": "HIGH"
-            })
-    
-    rule_results["findings"].extend(iam_findings)
-    rule_score = rule_results["overall_score"]
-    if iam_findings: 
-        rule_score = min(rule_score, 20) # Force a drop in health if Owner is being removed
-
-    ml_threat_prob = ml_engine.predict_risk([
+    ml_features = [
         indicators.change_freq,
         indicators.unauth_attempts,
-        indicators.public_resources
-    ])
+        indicators.public_resources,
+        getattr(indicators, 'sensitive_calls', 2) # Support for future schema extension
+    ]
+    
+    ml_threat_prob = ml_engine.predict_risk(ml_features)
     ml_score = (1 - ml_threat_prob) * 100
 
-    # Weighted: 60% Rules, 40% ML
-    final_risk_score = int((0.6 * rule_score) + (0.4 * ml_score))
+    # 4. Contextual Alerting (Hijack Detection)
+    # If the user is on a sensitive page (like GCP IAM) and indicators show high freq
+    if provider == "gcp" and indicators.unauth_attempts > 5:
+        rule_results["findings"].insert(0, {
+            "rule_id": "GCP_OWNER_REMOVAL_DETECTED",
+            "name": "CRITICAL HIJACK ATTEMPT",
+            "status": "FAIL",
+            "severity": "CRITICAL"
+        })
+        rule_results["overall_score"] = min(rule_results["overall_score"], 15)
+
+    # Weighted: 70% Rules, 30% ML
+    final_risk_score = int((0.7 * rule_results["overall_score"]) + (0.3 * ml_score))
 
     return {
         "status": "success",
@@ -129,18 +108,21 @@ async def perform_security_assessment(request: SecurityCheckRequest):
 
 @router.post("/remediate")
 async def trigger_auto_remediation(request: RemediationRequest):
-    """Mock auto-remediation endpoint (reverts misconfigurations)."""
-    # Logic in production would use Boto3/SDKs to revert the specific issue_id
+    """Enterprise remediation engine (Simulated)."""
     return {
         "status": "success",
         "action": "AUTO_REMEDIATION_TRIGGERED",
         "resource": request.resource_id,
-        "fix": f"Reverting {request.issue_id} to safe baseline"
+        "issue": request.issue_id,
+        "fix": f"Auto-reverting {request.issue_id} to secure baseline state."
     }
 
 def _get_recommendations(provider: str, findings: List[Dict]) -> List[str]:
-    recs = ["Enable CloudTrail for audit logging."] if provider == "aws" else ["Enable Activity Logs."]
+    recs = ["Enable Advanced GuardDuty protection."] if provider == "aws" else ["Enable Microsoft Defender for Cloud."]
     for f in findings:
         if f["status"] == "FAIL":
-            recs.append(f"Remediate {f['name']} immediately.")
-    return list(set(recs)) # Unique list
+            if f["severity"] == "CRITICAL":
+                recs.append(f"IMMEDIATE ACTION: Fix {f['name']} via Remediation Center.")
+            else:
+                recs.append(f"Apply recommended fix for {f['name']}.")
+    return list(set(recs))

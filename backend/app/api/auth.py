@@ -14,19 +14,19 @@ class PasswordSetupRequest(BaseModel):
     password: str
 
 class VerifyRequest(BaseModel):
-    password: str
+    passcode: str
 
 @router.post("/setup")
 async def setup_password(request: PasswordSetupRequest):
     users[request.username] = hashlib.sha256(request.password.encode()).hexdigest()
-    return {"status": "success", "msg": "Master password set."}
+    return {"status": "success", "msg": "Master passcode set."}
 
 @router.post("/verify")
 async def verify_password(request: VerifyRequest):
-    hashed = hashlib.sha256(request.password.encode()).hexdigest()
+    hashed = hashlib.sha256(request.passcode.encode()).hexdigest()
     if hashed in users.values():
         return {"status": "success"}
-    raise HTTPException(status_code=401, detail="Invalid master password.")
+    raise HTTPException(status_code=401, detail="Invalid master passcode.")
 
 @router.get("/has-password")
 async def check_password_exists():
