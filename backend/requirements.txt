@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+boto3
+azure-mgmt-resource
+azure-identity
+google-cloud-resource-manager
+scikit-learn
+pandas
+reportlab
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+jinja2

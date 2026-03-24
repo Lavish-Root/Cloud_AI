@@ -1,0 +1,49 @@
+{
+    "aws": {
+        "iam_roles": [
+            {
+                "name": "AdminRole",
+                "permissions": "FullAccess",
+                "mfa": true
+            },
+            {
+                "name": "ReadOnly",
+                "permissions": "ReadOnlyAccess",
+                "mfa": false
+            }
+        ],
+        "storage_buckets": [
+            {
+                "name": "prod-data",
+                "public": false,
+                "encrypted": true
+            },
+            {
+                "name": "public-assets",
+                "public": true,
+                "encrypted": false
+            }
+        ],
+        "firewall_rules": [
+            {
+                "id": "sg-123",
+                "port": 80,
+                "action": "allow",
+                "source": "0.0.0.0/0"
+            },
+            {
+                "id": "sg-456",
+                "port": 22,
+                "action": "allow",
+                "source": "10.0.0.0/24"
+            }
+        ],
+        "databases": [
+            {
+                "id": "db-prod",
+                "public": false,
+                "encrypted": true
+            }
+        ]
+    }
+}
