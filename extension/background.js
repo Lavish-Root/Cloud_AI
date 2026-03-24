@@ -37,6 +37,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ status: 'error', message: 'Could not reach backend security engine.' });
             });
         });
-        return true; // async handle
+        return true;
+    }
+    
+    if (request.action === 'simulateAttack') {
+        const backendUrl = "http://localhost:8000/api/security/check";
+        fetch(backendUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                url: "https://console.cloud.google.com/iam-admin",
+                indicators: {
+                    change_freq: 50,
+                    unauth_attempts: 15,
+                    public_resources: 5,
+                    sensitive_calls: 25
+                }
+            })
+        })
+        .then(response => response.json())
+        .then(data => sendResponse(data))
+        .catch(err => sendResponse({ status: 'error', message: 'Backend unreachable.' }));
+        return true;
     }
 });

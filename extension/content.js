@@ -53,8 +53,12 @@ const injectSecurityHUD = () => {
             <div style="display: flex; align-items: center; gap: 10px;"><span style="color: #10b981;">●</span> Audit Integrity: <span style="color: #10b981; font-weight: 700;">Verified</span></div>
         </div>
 
-        <button id="cg-dashboard-btn" style="width: 100%; background: #2563eb; border: none; padding: 16px; border-radius: 18px; color: white; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);">
+        <button id="cg-dashboard-btn" style="width: 100%; background: #2563eb; border: none; padding: 16px; border-radius: 18px; color: white; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);">
             Admin Console
+        </button>
+
+        <button id="cg-simulate-btn" style="width: 100%; background: #e53e3e; border: none; padding: 12px; border-radius: 12px; color: white; font-weight: 700; font-size: 11px; text-transform: uppercase; cursor: pointer; transition: all 0.3s;">
+            🚨 Simulate Cloud Attack
         </button>
     `;
 
@@ -70,6 +74,19 @@ const injectSecurityHUD = () => {
     btn.onmouseover = () => btn.style.background = '#2b6cb0';
     btn.onmouseout = () => btn.style.background = '#3182ce';
     btn.onclick = () => window.open('http://localhost:5173', '_blank'); // Assuming dashboard runs on 5173
+
+    const simBtn = document.getElementById('cg-simulate-btn');
+    simBtn.onmouseover = () => simBtn.style.background = '#c53030';
+    simBtn.onmouseout = () => simBtn.style.background = '#e53e3e';
+    simBtn.onclick = () => {
+        simBtn.innerText = "Analyzing...";
+        chrome.runtime.sendMessage({ action: "simulateAttack" }, (response) => {
+            if (response && response.riskScore) {
+                updateHUD(response);
+            }
+            simBtn.innerText = "🚨 Simulate Cloud Attack";
+        });
+    };
 
     // Ask extension for data
     chrome.runtime.sendMessage({ action: "getSecurityData" }, (response) => {
@@ -110,6 +127,9 @@ const injectSecurityHUD = () => {
 
     const injectHijackAlert = () => {
         const hijackDiv = document.createElement('div');
+        hijackDiv.id = 'cg-hijack-alert';
+        if (document.getElementById('cg-hijack-alert')) return;
+
         hijackDiv.style = `
             position: fixed;
             top: 100px;
@@ -129,7 +149,7 @@ const injectSecurityHUD = () => {
         `;
         hijackDiv.innerHTML = `
             ⚠️ CRITICAL HIJACK ATTEMPT DETECTED! ⚠️<br>
-            <span style="font-size: 16px; font-weight: 400;">Unauthorized Ownership Removal Detected in GCP IAM Console</span>
+            <span style="font-size: 16px; font-weight: 400;">Unauthorized Action Blocked by Prevention-First Protocol</span>
             <div style="margin-top: 15px; font-size: 14px;">Review in CloudGuard Dashboard Immediately</div>
         `;
         const style = document.createElement('style');
@@ -138,6 +158,28 @@ const injectSecurityHUD = () => {
         document.body.appendChild(hijackDiv);
         setTimeout(() => hijackDiv.remove(), 10000);
     };
+
+    // --- PREVENTION FIRST APPROACH ---
+    document.addEventListener('click', (e) => {
+        const scoreElem = document.getElementById('cg-risk-score');
+        if (!scoreElem) return;
+        
+        const scoreStr = scoreElem.innerText;
+        const score = parseInt(scoreStr.split('/')[0]);
+        
+        // Block destructive actions if score is critical (<= 50)
+        if (!isNaN(score) && score <= 50) {
+            const btnText = (e.target.innerText || e.target.value || '').toLowerCase();
+            const destructivePattern = /\\b(delete|remove|revoke|destroy|disable)\\b/i;
+            
+            if (destructivePattern.test(btnText)) {
+                e.preventDefault();
+                e.stopPropagation();
+                injectHijackAlert();
+                console.warn("CloudGuard AI: Destructive action blocked due to CRITICAL risk score.");
+            }
+        }
+    }, true); // Use capture phase to intercept before React/Angular handlers
 };
 
 // Check if we are already injected

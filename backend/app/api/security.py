@@ -96,6 +96,18 @@ async def perform_security_assessment(request: SecurityCheckRequest):
         "anomaly_level": "LOW" if ml_threat_prob < 0.3 else ("HIGH" if ml_threat_prob > 0.7 else "MEDIUM")
     }
     
+    # --- AUTO ROLLBACK ---
+    from app.services.cloud_environment import cloud_env
+    from app.db.database import save_audit_log
+    
+    for finding in rule_results["findings"]:
+        if finding["status"] == "FAIL" and finding["severity"] == "CRITICAL":
+            # Auto-remediate critical issues immediately
+            cloud_env.apply_remediation(provider, "auto-detect", finding["rule_id"])
+            save_audit_log("AUTO_REMEDIATION", "auto-detect", f"Auto-reverting {finding['rule_id']} to secure baseline")
+            finding["name"] += " (AUTO-REMEDIATED)"
+            # finding is technically resolved now, but passing it back with a note for the UI.
+
     save_scan(provider, final_risk_score, rule_results["findings"], ml_inference)
 
     return {
