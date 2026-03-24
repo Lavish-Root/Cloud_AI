@@ -42,5 +42,54 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
+import threading
+import time
+import random
+import uuid
+from datetime import datetime
+from app.api.governance import approval_queue
+from app.api.reporting import report_data
+from app.services.security_state import security_state
+
+def background_simulator():
+    """Simulates real-time security incidents and governance requests."""
+    actions = ["Revoke Public S3 Access", "Patch Firewall Rule", "Rotate IAM Key", "Encrypt RDS Instance"]
+    while True:
+        time.sleep(15) 
+        
+        # 1. Simulate Security Drift / Hijack Attempts
+        # 10% chance of a hijack attempt per cycle
+        if random.random() < 0.1:
+            security_state.update_indicators(unauth_attempts=random.randint(6, 12), change_freq=random.randint(11, 25))
+        else:
+            # Baseline activity
+            security_state.update_indicators(unauth_attempts=0, change_freq=random.randint(1, 5))
+
+        # 2. Add to Governance & Reports
+        if len(approval_queue) < 10:
+            new_id = str(uuid.uuid4())
+            action = random.choice(actions)
+            severity = random.choice(["MEDIUM", "HIGH", "CRITICAL"])
+            
+            approval_queue.append({
+                "id": new_id,
+                "action": action,
+                "resource": f"arn:cloud:res:{random.randint(1000, 9999)}",
+                "requested_by": "CloudGuard AI",
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "PENDING",
+                "severity": severity
+            })
+
+            report_data.append({
+                "Resource": f"res-{random.randint(100, 999)}",
+                "Provider": random.choice(["AWS", "Azure", "GCP"]),
+                "Violation": action,
+                "Status": "Open"
+            })
+
+# Start the simulator thread
+threading.Thread(target=background_simulator, daemon=True).start()
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -4,6 +4,7 @@ from typing import Dict, Optional, List, Any, cast
 from app.rules.checker import rules_engine
 from app.ml.engine import ml_engine
 from app.services.cloud_scanner import scanner
+from app.services.security_state import security_state
 
 router = APIRouter(prefix="/api/security")
 
@@ -13,6 +14,7 @@ class SecurityIndicator(BaseModel):
     change_freq: int = Field(default=2, description="Frequency of resource modifications")
     unauth_attempts: int = Field(default=0, description="Logged unauthorized access attempts")
     public_resources: int = Field(default=0, description="Count of publicly accessible resources")
+    sensitive_calls: int = Field(default=2, description="Suspicious API calls detected")
 
 class SecurityCheckRequest(BaseModel):
     url: str
@@ -42,8 +44,6 @@ class RemediationRequest(BaseModel):
     resource_id: str
     issue_id: str
 
-
-
 # --- API Endpoints ---
 
 @router.post("/check", response_model=SecurityCheckResponse)
@@ -55,34 +55,34 @@ async def perform_security_assessment(request: SecurityCheckRequest):
     url = request.url.lower()
     if "aws.amazon.com" in url: provider = "aws"
     elif "azure.com" in url: provider = "azure"
-    elif "console.cloud.google.com" in url: provider = "gcp"
+    elif "console.cloud.google.com" in url or "cloud.google.com" in url: provider = "gcp"
 
     if provider == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported cloud provider URL.")
 
     # 2. Real-Time Security Scan
-    # The scanner now returns a detailed resource map matching the upgraded RulesEngine
     actual_state: Dict[str, Any] = scanner.scan_environment(provider)
     
-    # 3. Hybrid Threat Intelligence
-    # Pass the full state to the rules engine
+    # 3. Use Global Backend-Managed Indicators (Resolves 'random on refresh')
+    indicators = security_state.get_indicators()
+
+    # 4. Hybrid Scoring
+    # The collaborator version passes full state, so I'll follow that pattern
     rule_results = rules_engine.evaluate(provider, actual_state)
     
-    # ML features: [change_freq, unauth_attempts, public_resources, sensitive_calls]
-    indicators = request.indicators or SecurityIndicator()
+    # ML Features
     ml_features = [
         indicators.change_freq,
         indicators.unauth_attempts,
         indicators.public_resources,
-        getattr(indicators, 'sensitive_calls', 2) # Support for future schema extension
+        indicators.sensitive_calls
     ]
-    
     ml_threat_prob = ml_engine.predict_risk(ml_features)
     ml_score = (1 - ml_threat_prob) * 100
 
-    # 4. Contextual Alerting (Hijack Detection)
-    # If the user is on a sensitive page (like GCP IAM) and indicators show high freq
-    if provider == "gcp" and indicators.unauth_attempts > 5:
+    # 5. Contextual Alerting (Hijack Detection)
+    if (provider == "gcp" or "console.cloud.google.com" in url) and indicators.unauth_attempts > 5:
+        # Use the collaborator's naming convention "CRITICAL HIJACK ATTEMPT"
         rule_results["findings"].insert(0, {
             "rule_id": "GCP_OWNER_REMOVAL_DETECTED",
             "name": "CRITICAL HIJACK ATTEMPT",
@@ -91,7 +91,7 @@ async def perform_security_assessment(request: SecurityCheckRequest):
         })
         rule_results["overall_score"] = min(rule_results["overall_score"], 15)
 
-    # Weighted: 70% Rules, 30% ML
+    # Weighted: 70% Rules, 30% ML (Following collaborator's updated weights)
     final_risk_score = int((0.7 * rule_results["overall_score"]) + (0.3 * ml_score))
 
     return {
@@ -105,6 +105,12 @@ async def perform_security_assessment(request: SecurityCheckRequest):
         },
         "recommendations": _get_recommendations(provider, rule_results["findings"])
     }
+
+@router.post("/remediate/intercept")
+async def intercept_hijack():
+    """Manually clear the active hijack threat via Secure & Intercept action."""
+    security_state.resolve_hijack()
+    return {"status": "success", "message": "Attack vector neutralized. Baseline restored."}
 
 @router.post("/remediate")
 async def trigger_auto_remediation(request: RemediationRequest):
@@ -121,8 +127,8 @@ def _get_recommendations(provider: str, findings: List[Dict]) -> List[str]:
     recs = ["Enable Advanced GuardDuty protection."] if provider == "aws" else ["Enable Microsoft Defender for Cloud."]
     for f in findings:
         if f["status"] == "FAIL":
-            if f["severity"] == "CRITICAL":
+            if f.get("severity") == "CRITICAL":
                 recs.append(f"IMMEDIATE ACTION: Fix {f['name']} via Remediation Center.")
             else:
-                recs.append(f"Apply recommended fix for {f['name']}.")
+                recs.append(f"Remediate {f['name']} immediately.")
     return list(set(recs))

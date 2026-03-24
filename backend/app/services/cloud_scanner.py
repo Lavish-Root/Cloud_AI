@@ -54,7 +54,11 @@ class CloudScanner:
             ],
             "network_security_groups": [
                 {"name": "nsg-prod", "rules": [{"name": "AllowSSH", "priority": 100, "access": "Allow", "source": "0.0.0.0/0"}]}
-            ]
+            ],
+            "security_center": {
+                "score": random.randint(70, 95),
+                "mfa_enabled": True
+            }
         }
 
     def _scan_gcp(self) -> Dict[str, Any]:
@@ -69,6 +73,9 @@ class CloudScanner:
             ],
             "cloud_storage": [
                 {"name": "sensitive-data-bucket", "uniform_access": True, "public": random.choice([False, True])}
+            ],
+            "projects": [
+                {"id": "cloudguard-prod", "owner_count": random.randint(1, 3)}
             ]
         }
 

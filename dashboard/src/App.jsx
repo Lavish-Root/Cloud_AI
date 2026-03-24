@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Key, ShieldAlert, X, Zap } from 'lucide-react';
+import { Key, ShieldAlert, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
@@ -27,15 +27,9 @@ const App = () => {
   const fetchSecurityData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const indicators = { 
-        change_freq: Math.floor(Math.random() * 5), 
-        unauth_attempts: Math.floor(Math.random() * 2), 
-        public_resources: 0 
-      };
-
+      // Backend automatically manages indicators for real-time consistency
       const response = await axios.post(`${API_BASE}/api/security/check`, { 
-        url: "console.cloud.google.com", 
-        indicators 
+        url: "console.cloud.google.com" 
       });
       setSecurityData(response.data);
     } catch (err) { 
@@ -53,13 +47,11 @@ const App = () => {
 
   const handleVerifyPasscode = async () => {
     try {
-      await axios.post(`${API_BASE}/api/auth/verify`, { passcode: passcode });
+      await axios.post(`${API_BASE}/api/auth/verify`, { password: passcode });
       setShowAuthModal(false);
       setPasscode('');
-      if (pendingAction) {
-        pendingAction();
-        setPendingAction(null);
-      }
+      if (pendingAction) await pendingAction();
+      fetchSecurityData(); // Refresh immediately after action
     } catch (err) { 
       alert("Incorrect Master Passcode!"); 
     }
@@ -67,9 +59,16 @@ const App = () => {
 
   const triggerIgnore = (ruleId) => {
     setPendingAction(() => async () => {
-       // In a real app, this would call an ignore endpoint
-       console.log("Ignoring rule:", ruleId);
-       fetchSecurityData();
+       try {
+         // Intercept & Secure call for hijacking attempts
+         if (ruleId === 'GCP_OWNER_REMOVAL_DETECTED') {
+           await axios.post(`${API_BASE}/api/security/remediate/intercept`);
+         }
+         console.log("Neutralized rule:", ruleId);
+         fetchSecurityData();
+       } catch (err) { 
+         console.error("Remediation failed", err); 
+       }
     });
     setShowAuthModal(true);
   };
