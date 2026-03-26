@@ -8,6 +8,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Overview from './components/Overview';
 import RemediationCenter from './components/RemediationCenter';
+import GlobalConsole from './components/GlobalConsole';
 
 const API_BASE = "http://localhost:8000";
 
@@ -19,25 +20,28 @@ const App = () => {
     provider: 'aws',
     mlInference: { threat_probability: 0, anomaly_level: 'LOW' }
   });
+  const [selectedProvider, setSelectedProvider] = useState('all');
+  const [batchData, setBatchData] = useState([]);
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [passcode, setPasscode] = useState('');
+  const [simulatedUrl, setSimulatedUrl] = useState('');
   const [pendingAction, setPendingAction] = useState(null);
 
   const fetchSecurityData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Backend automatically manages indicators for real-time consistency
-      const response = await axios.post(`${API_BASE}/api/security/check`, { 
-        url: "console.cloud.google.com",
-        indicators: {
-          change_freq: Math.floor(Math.random() * 5),
-          unauth_attempts: Math.floor(Math.random() * 2),
-          public_resources: 1
-        }
-      });
-      setSecurityData(response.data);
+      if (selectedProvider === 'all') {
+        const response = await axios.get(`${API_BASE}/api/security/batch-check?url=${simulatedUrl}`);
+        setBatchData(response.data.data);
+      } else {
+        const response = await axios.post(`${API_BASE}/api/security/check`, { 
+          url: simulatedUrl || "http://unknown.com",
+          provider: selectedProvider
+        });
+        setSecurityData(response.data);
+      }
       
       const historyRes = await axios.get(`${API_BASE}/api/security/history`);
       setHistory(historyRes.data);
@@ -46,17 +50,19 @@ const App = () => {
     } finally { 
       setIsLoading(false); 
     }
-  }, []);
+  }, [selectedProvider, simulatedUrl]);
 
   useEffect(() => {
     fetchSecurityData();
-    const interval = setInterval(fetchSecurityData, 15000);
+    // High-frequency 5s polling for Intel views, 15s for general Overview
+    const intervalTime = ['ThreatIntel', 'Activity'].includes(currentView) ? 5000 : 15000;
+    const interval = setInterval(fetchSecurityData, intervalTime);
     return () => clearInterval(interval);
-  }, [fetchSecurityData]);
+  }, [fetchSecurityData, currentView]);
 
   const handleVerifyPasscode = async () => {
     try {
-      await axios.post(`${API_BASE}/api/auth/verify`, { password: passcode });
+      await axios.post(`${API_BASE}/api/auth/verify`, { passcode: passcode });
       setShowAuthModal(false);
       setPasscode('');
       if (pendingAction) await pendingAction();
@@ -162,43 +168,56 @@ const App = () => {
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <Header currentView={currentView} provider={securityData.provider} score={securityData.riskScore} />
+        <Header 
+          currentView={currentView} 
+          provider={selectedProvider} 
+          score={securityData.riskScore} 
+          onProviderChange={setSelectedProvider}
+          simulatedUrl={simulatedUrl}
+          onUrlChange={setSimulatedUrl}
+        />
 
         <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
-              key={currentView}
+              key={currentView + selectedProvider}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              {currentView === 'Overview' && (
-                <Overview data={securityData} history={history} triggerIgnore={triggerIgnore} />
-              )}
-              {currentView === 'Remediation' && (
-                <RemediationCenter 
-                  findings={securityData.ruleFindings} 
-                  provider={securityData.provider} 
-                  onRemediated={onRemediated} 
-                />
-              )}
-              {currentView === 'Activity' && (
-                <div className="glass-card p-10 rounded-[3rem]">
-                   <h2 className="text-2xl font-black text-white mb-6">Security Audit Logs</h2>
-                   <p className="text-slate-500 mb-8 border-b border-slate-800 pb-8 uppercase text-[10px] font-bold tracking-[0.2em]">Full chain of custody event history</p>
-                   <div className="space-y-4">
-                      {securityData.ruleFindings.map((f, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5">
-                           <div className="flex items-center gap-4">
-                              <div className={`w-2 h-2 rounded-full ${f.status === 'PASS' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                              <span className="text-sm font-bold text-slate-300">{f.name}</span>
-                           </div>
-                           <span className="text-[10px] font-black text-slate-500 uppercase">{f.rule_id}</span>
-                        </div>
-                      ))}
-                   </div>
-                </div>
+              {selectedProvider === 'all' ? (
+                <GlobalConsole batchData={batchData} onDrilldown={setSelectedProvider} />
+              ) : (
+                <>
+                  {currentView === 'Overview' && (
+                    <Overview data={securityData} history={history} triggerIgnore={triggerIgnore} />
+                  )}
+                  {currentView === 'Remediation' && (
+                    <RemediationCenter 
+                      findings={securityData.ruleFindings} 
+                      provider={selectedProvider} 
+                      onRemediated={onRemediated} 
+                    />
+                  )}
+                  {currentView === 'Activity' && (
+                    <div className="glass-card p-10 rounded-[3rem]">
+                       <h2 className="text-2xl font-black text-white mb-6">Security Audit Logs ({selectedProvider.toUpperCase()})</h2>
+                       <p className="text-slate-500 mb-8 border-b border-slate-800 pb-8 uppercase text-[10px] font-bold tracking-[0.2em]">Full chain of custody event history</p>
+                       <div className="space-y-4">
+                          {securityData.ruleFindings.map((f, i) => (
+                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5">
+                               <div className="flex items-center gap-4">
+                                  <div className={`w-2 h-2 rounded-full ${f.status === 'PASS' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                  <span className="text-sm font-bold text-slate-300">{f.name}</span>
+                               </div>
+                               <span className="text-[10px] font-black text-slate-500 uppercase">{f.rule_id}</span>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                  )}
+                </>
               )}
               {['Inventory', 'Policies', 'ThreatIntel'].includes(currentView) && (
                 <div className="h-full flex flex-col items-center justify-center text-slate-600 border-2 border-dashed border-slate-800/50 rounded-[3rem] p-20">

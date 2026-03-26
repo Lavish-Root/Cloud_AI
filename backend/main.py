@@ -22,7 +22,12 @@ async def add_no_cache_header(request: Request, call_next):
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"], 
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,7 +54,7 @@ import uuid
 from datetime import datetime
 from app.api.governance import approval_queue
 from app.api.reporting import report_data
-from app.services.security_state import security_state
+from app.services.cloud_environment import cloud_env
 
 def background_simulator():
     """Simulates real-time security incidents and governance requests."""
@@ -60,10 +65,10 @@ def background_simulator():
         # 1. Simulate Security Drift / Hijack Attempts
         # 10% chance of a hijack attempt per cycle
         if random.random() < 0.1:
-            security_state.update_indicators(unauth_attempts=random.randint(6, 12), change_freq=random.randint(11, 25))
+            cloud_env.update_indicators(unauth_attempts=random.randint(6, 12))
         else:
             # Baseline activity
-            security_state.update_indicators(unauth_attempts=0, change_freq=random.randint(1, 5))
+            cloud_env.update_indicators(unauth_attempts=0)
 
         # 2. Add to Governance & Reports
         if len(approval_queue) < 10:

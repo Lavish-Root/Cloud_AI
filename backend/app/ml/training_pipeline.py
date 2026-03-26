@@ -178,7 +178,7 @@ def generate_synthetic_logs(n_normal=1000, n_anomalies=50) -> pd.DataFrame:
 # --- STEP 5: ML MODEL TRAINING ---
 def train_model():
     print("Generating Synthetic Behavior Data...")
-    raw_logs_df = generate_synthetic_logs()
+    raw_logs_df = generate_synthetic_logs(n_normal=5000, n_anomalies=100)
     
     print("Extracting Cloud-Agnostic Features...")
     engineer = FeatureEngineer()
@@ -197,13 +197,13 @@ def train_model():
     X_scaled = scaler.fit_transform(X)
     
     print("Training Isolation Forest Anomaly Detector...")
-    model = IsolationForest(contamination=0.05, random_state=42)
+    model = IsolationForest(contamination='auto', random_state=42)
     model.fit(X_scaled)
     
     print("Saving Models (joblib)...")
     joblib.dump(model, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
-    print("✅ Model Training Complete & Saved!")
+    print("Model Training Complete & Saved!")
 
 if __name__ == "__main__":
     train_model()

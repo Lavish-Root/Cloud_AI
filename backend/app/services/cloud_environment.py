@@ -49,10 +49,27 @@ class CloudEnvironment:
             }
         }
         self.last_drift = datetime.now()
+        self.unauth_attempts = 0 # Persistent across scans until resolved
 
     def get_state(self, provider: str) -> Dict[str, Any]:
         self._apply_periodic_drift()
-        return self._state.get(provider, {})
+        state = self._state.get(provider, {})
+        # If we are under attack, inject it into the state
+        if self.unauth_attempts > 5 and provider == "gcp":
+            pass # The security API handles the specific finding injection for now
+        return state
+
+    def update_indicators(self, unauth_attempts: int):
+        self.unauth_attempts = unauth_attempts
+
+    def resolve_attack(self):
+        """Neutralizes the active hijacking threat."""
+        self.unauth_attempts = 0
+        # Reset any malicious owner roles in GCP
+        self._state["gcp"]["iam_policies"] = [
+            p for p in self._state["gcp"]["iam_policies"] 
+            if "attacker" not in p["member"] and "unknown-actor" not in p["member"]
+        ]
 
     def apply_remediation(self, provider: str, resource_id: str, issue_id: str):
         """Actually modifies the state to 'fix' the issue."""

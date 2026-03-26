@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException
+import random
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, List, Any, cast
 from app.rules.checker import rules_engine
 from app.ml.engine import ml_engine
 from app.services.cloud_scanner import scanner
-from app.services.security_state import security_state
 from app.db.database import save_scan, get_recent_scans
 
 router = APIRouter(prefix="/api/security")
@@ -61,13 +61,28 @@ async def perform_security_assessment(request: SecurityCheckRequest):
     if provider == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported cloud provider URL.")
 
-    # 2. Real-Time Security Scan
-    actual_state: Dict[str, Any] = scanner.scan_environment(provider)
+    # 2. Real-Time Security Scan (Connection-Dependent)
+    actual_state: Dict[str, Any] = scanner.scan_environment(provider, browser_url=url)
+    
+    if actual_state.get("status") == "DISCONNECTED":
+        return {
+            "status": "DISCONNECTED",
+            "provider": provider,
+            "riskScore": 0,
+            "ruleFindings": [],
+            "mlInference": {"threat_probability": 0, "anomaly_level": "N/A"},
+            "recommendations": [f"Please open the {provider.upper()} console to sync data."]
+        }
     
     # 3. Hybrid Threat Intelligence
     rule_results = rules_engine.evaluate(provider, actual_state)
     
     indicators = request.indicators or SecurityIndicator()
+    
+    # Sync indicators to the persistent cloud environment
+    from app.services.cloud_environment import cloud_env
+    cloud_env.update_indicators(indicators.unauth_attempts)
+    
     ml_features = [
         indicators.change_freq,
         indicators.unauth_attempts,
@@ -79,7 +94,7 @@ async def perform_security_assessment(request: SecurityCheckRequest):
     ml_score = (1 - ml_threat_prob) * 100
 
     # 4. Contextual Alerting (Hijack Detection)
-    if provider == "gcp" and indicators.unauth_attempts > 5:
+    if provider == "gcp" and cloud_env.unauth_attempts > 5:
         rule_results["findings"].insert(0, {
             "rule_id": "GCP_OWNER_REMOVAL_DETECTED",
             "name": "CRITICAL HIJACK ATTEMPT",
@@ -122,13 +137,56 @@ async def perform_security_assessment(request: SecurityCheckRequest):
 @router.post("/remediate/intercept")
 async def intercept_hijack():
     """Manually clear the active hijack threat via Secure & Intercept action."""
-    security_state.resolve_hijack()
+    from app.services.cloud_environment import cloud_env
+    cloud_env.resolve_attack()
     return {"status": "success", "message": "Attack vector neutralized. Baseline restored."}
 
 @router.get("/history")
 async def get_security_history():
     """Returns the last 50 security scans for trend analysis."""
     return get_recent_scans(limit=50)
+
+@router.get("/batch-check")
+async def perform_batch_check(url: str = ""):
+    """Enterprise-grade multi-cloud assessment for a global unified dashboard."""
+    providers = ["aws", "azure", "gcp"]
+    batch_results = []
+    
+    from app.services.cloud_environment import cloud_env
+    
+    for provider in providers:
+        actual_state = scanner.scan_environment(provider, browser_url=url)
+        
+        if actual_state.get("status") == "DISCONNECTED":
+            batch_results.append({
+                "provider": provider,
+                "status": "DISCONNECTED",
+                "riskScore": 0,
+                "findingsCount": 0,
+                "mlInference": {"threat_probability": 0, "anomaly_level": "N/A"}
+            })
+            continue
+
+        rule_results = rules_engine.evaluate(provider, actual_state)
+        
+        # ML Inference (Mocking consistent indicators for each)
+        ml_features = [random.randint(1,5), cloud_env.unauth_attempts if provider == "gcp" else 0, 1, 2]
+        ml_threat_prob = ml_engine.predict_risk(ml_features)
+        ml_score = (1 - ml_threat_prob) * 100
+        
+        final_score = int((0.7 * rule_results["overall_score"]) + (0.3 * ml_score))
+        
+        batch_results.append({
+            "provider": provider,
+            "riskScore": final_score,
+            "findingsCount": len([f for f in rule_results["findings"] if f["status"] == "FAIL"]),
+            "mlInference": {
+                "threat_probability": ml_threat_prob,
+                "anomaly_level": "LOW" if ml_threat_prob < 0.3 else ("HIGH" if ml_threat_prob > 0.7 else "MEDIUM")
+            }
+        })
+        
+    return {"status": "success", "data": batch_results}
 
 @router.post("/remediate")
 async def trigger_auto_remediation(request: RemediationRequest):

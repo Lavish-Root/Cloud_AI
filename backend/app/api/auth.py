@@ -1,12 +1,15 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-import hashlib
+import bcrypt
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/auth")
 
-# In-memory password storage for demo
+# In-memory passcode storage (simulating a DB)
+# Default 'password123' hashed with bcrypt
+_default_hash = bcrypt.hashpw("password123".encode(), bcrypt.gensalt()).decode()
 users = {
-    "admin": hashlib.sha256("password123".encode()).hexdigest()
+    "admin": _default_hash
 }
 
 class PasswordSetupRequest(BaseModel):
@@ -18,14 +21,18 @@ class VerifyRequest(BaseModel):
 
 @router.post("/setup")
 async def setup_password(request: PasswordSetupRequest):
-    users[request.username] = hashlib.sha256(request.password.encode()).hexdigest()
-    return {"status": "success", "msg": "Master passcode set."}
+    # Salted bcrypt hash
+    hashed = bcrypt.hashpw(request.password.encode(), bcrypt.gensalt()).decode()
+    users[request.username] = hashed
+    return {"status": "success", "msg": "Master passcode securely established."}
 
 @router.post("/verify")
 async def verify_password(request: VerifyRequest):
-    hashed = hashlib.sha256(request.passcode.encode()).hexdigest()
-    if hashed in users.values():
-        return {"status": "success"}
+    # Verify against all stored hashes
+    for stored_hash in users.values():
+        if bcrypt.checkpw(request.passcode.encode(), stored_hash.encode()):
+            return {"status": "success"}
+            
     raise HTTPException(status_code=401, detail="Invalid master passcode.")
 
 @router.get("/has-password")
