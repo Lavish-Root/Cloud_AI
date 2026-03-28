@@ -52,7 +52,6 @@ class CloudEnvironment:
         self.unauth_attempts = 0 # Persistent across scans until resolved
 
     def get_state(self, provider: str) -> Dict[str, Any]:
-        self._apply_periodic_drift()
         state = self._state.get(provider, {})
         # If we are under attack, inject it into the state
         if self.unauth_attempts > 5 and provider == "gcp":
@@ -96,18 +95,6 @@ class CloudEnvironment:
                      for rule in acl["rules"]:
                          if rule["port"] == 22: rule["source"] = "10.0.0.0/16"
 
-    def _apply_periodic_drift(self):
-        """Simulates configuration drift if more than 2 minutes passed since last check."""
-        if datetime.now() - self.last_drift > timedelta(minutes=2):
-            # Introduce a random vulnerability
-            provider = random.choice(["aws", "azure", "gcp"])
-            if provider == "aws":
-                self._state["aws"]["storage_buckets"][0]["public"] = True
-            elif provider == "azure":
-                self._state["azure"]["virtual_machines"][0]["managed_disk_encryption"] = False
-            elif provider == "gcp":
-                self._state["gcp"]["iam_policies"].append({"member": "user:unknown-actor@attacker.io", "role": "roles/owner"})
-            
-            self.last_drift = datetime.now()
+
 
 cloud_env = CloudEnvironment()

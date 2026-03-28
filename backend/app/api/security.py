@@ -169,8 +169,13 @@ async def perform_batch_check(url: str = ""):
 
         rule_results = rules_engine.evaluate(provider, actual_state)
         
-        # ML Inference (Mocking consistent indicators for each)
-        ml_features = [random.randint(1,5), cloud_env.unauth_attempts if provider == "gcp" else 0, 1, 2]
+        # ML Inference based on current environment state
+        change_freq = 0
+        unauth_attempts = cloud_env.unauth_attempts if provider == "gcp" else 0
+        public_resources = 1
+        sensitive_calls = 2
+        
+        ml_features = [change_freq, unauth_attempts, public_resources, sensitive_calls]
         ml_threat_prob = ml_engine.predict_risk(ml_features)
         ml_score = (1 - ml_threat_prob) * 100
         

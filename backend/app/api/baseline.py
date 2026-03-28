@@ -29,6 +29,6 @@ async def check_drift_status(provider: str):
 
 @router.post("/reset")
 async def reset_baseline(request: BaselineRequest):
-    """Mock baseline reset."""
+    """Reset environmental baseline to allow new snapshots."""
     baseline_engine.baseline_data.pop(request.provider, None)
     return {"status": "baseline_cleared", "provider": request.provider}

@@ -29,6 +29,27 @@ const App = () => {
   const [simulatedUrl, setSimulatedUrl] = useState('');
   const [pendingAction, setPendingAction] = useState(null);
 
+  const handleProviderChange = (provider) => {
+    setSelectedProvider(provider);
+    const PROVIDER_URLS = {
+      aws: "https://aws.amazon.com/console",
+      azure: "https://portal.azure.com",
+      gcp: "https://console.cloud.google.com",
+      all: ""
+    };
+    if (PROVIDER_URLS[provider] !== undefined) {
+      setSimulatedUrl(PROVIDER_URLS[provider]);
+    }
+  };
+
+  const handleUrlChange = (url) => {
+    setSimulatedUrl(url);
+    const lowUrl = url.toLowerCase();
+    if (lowUrl.includes("aws.amazon.com")) setSelectedProvider("aws");
+    else if (lowUrl.includes("portal.azure.com")) setSelectedProvider("azure");
+    else if (lowUrl.includes("console.cloud.google.com")) setSelectedProvider("gcp");
+  };
+
   const fetchSecurityData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -172,9 +193,9 @@ const App = () => {
           currentView={currentView} 
           provider={selectedProvider} 
           score={securityData.riskScore} 
-          onProviderChange={setSelectedProvider}
+          onProviderChange={handleProviderChange}
           simulatedUrl={simulatedUrl}
-          onUrlChange={setSimulatedUrl}
+          onUrlChange={handleUrlChange}
         />
 
         <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
